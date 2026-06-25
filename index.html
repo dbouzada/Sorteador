@@ -99,6 +99,17 @@ tr:hover td{background:#faf7ff}
 .btn-export{padding:13px 28px;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.18);border-radius:30px;color:#fff;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;backdrop-filter:blur(8px);transition:.15s}
 .btn-export:hover{background:rgba(255,255,255,0.14)}
 .hidden{display:none}
+/* HISTORIAL */
+.hist-card{background:#fff;border-radius:16px;border:1px solid #ebe5f5;padding:18px 20px;box-shadow:0 2px 8px rgba(75,0,130,.04)}
+.hist-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.hist-title{font-size:15px;font-weight:700;color:#18103a}
+.hist-meta{font-size:11px;color:#b0a0c8;margin-top:3px}
+.hist-badge{background:linear-gradient(135deg,#ede0ff,#d4b8f5);color:#5a009d;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px}
+.hist-winners{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.hist-winner-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#faf7ff;border-radius:10px}
+.hist-num{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#d4b8f5,#b890ef);color:#4B0082;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hist-winner-name{font-size:13px;font-weight:600;color:#18103a}
+.hist-winner-ticket{font-size:11px;color:#9b8bb5;margin-left:auto}
 
 /* FOOTER */
 footer{background:linear-gradient(135deg,#3d0070,#1a0040);color:rgba(255,255,255,.6);padding:2.5rem 2rem 1.5rem}
@@ -128,10 +139,11 @@ footer{background:linear-gradient(135deg,#3d0070,#1a0040);color:rgba(255,255,255
 
 <div class="wrapper">
   <aside class="sidebar">
-    <button class="nav-item active"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
+    <button class="nav-item active" id="navDashboard" onclick="showSection('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
+    <button class="nav-item" id="navHistorial" onclick="showSection('historial')"><i class="ti ti-history"></i> Historial</button>
   </aside>
 
-  <main class="main">
+  <main class="main" id="sectionDashboard">
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-icon"><i class="ti ti-users"></i></div>
@@ -180,6 +192,19 @@ footer{background:linear-gradient(135deg,#3d0070,#1a0040);color:rgba(255,255,255
           <tbody id="tableBody"></tbody>
         </table>
       </div>
+    </div>
+  </main>
+
+  <main class="main hidden" id="sectionHistorial" style="grid-column:2/4">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+      <h2 style="font-size:18px;font-weight:700;color:#18103a">Historial de sorteos</h2>
+      <button onclick="clearHistory()" style="padding:8px 16px;background:#fff;border:1.5px solid #e8e0f5;border-radius:10px;font-size:12px;color:#9b8bb5;cursor:pointer;font-family:inherit;font-weight:500;display:flex;align-items:center;gap:6px"><i class="ti ti-trash"></i> Limpiar historial</button>
+    </div>
+    <div id="historialList" style="display:flex;flex-direction:column;gap:12px"></div>
+    <div id="historialEmpty" class="hidden" style="background:#fff;border-radius:16px;padding:3rem;text-align:center;color:#b0a0c8;border:1px solid #ebe5f5">
+      <div style="font-size:40px;margin-bottom:12px">📋</div>
+      <p style="font-size:14px;font-weight:500">Todavía no hay sorteos registrados.</p>
+      <p style="font-size:12px;margin-top:4px">Los sorteos aparecerán acá automáticamente.</p>
     </div>
   </main>
 
@@ -417,11 +442,74 @@ function realizarSorteo(){
 
   modal.classList.remove('hidden');
   drawStars(canvas);
+  saveToHistory(lastWinners, sorteoName, clienteKey, numeroKey);
 }
 
 function closeReveal(){
   document.getElementById('winnerModal').classList.add('hidden');
   if(starsAnimId){cancelAnimationFrame(starsAnimId);starsAnimId=null;}
+}
+
+// ── HISTORIAL ──────────────────────────────────────────────────────────────
+function saveToHistory(winners, sorteoName, clienteKey, numeroKey){
+  const entry = {
+    id: Date.now(),
+    name: sorteoName || 'Sorteo sin nombre',
+    date: new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+    total: participants.length,
+    winners: winners.map(w=>({name: w[clienteKey]||'-', ticket: w[numeroKey]||'-'}))
+  };
+  const history = getHistory();
+  history.unshift(entry);
+  localStorage.setItem('almafuerte_sorteos', JSON.stringify(history));
+}
+
+function getHistory(){
+  try{ return JSON.parse(localStorage.getItem('almafuerte_sorteos')) || []; }
+  catch(e){ return []; }
+}
+
+function clearHistory(){
+  if(!confirm('¿Seguro que querés borrar todo el historial?')) return;
+  localStorage.removeItem('almafuerte_sorteos');
+  renderHistorial();
+}
+
+function renderHistorial(){
+  const list = document.getElementById('historialList');
+  const empty = document.getElementById('historialEmpty');
+  const history = getHistory();
+  list.innerHTML = '';
+  if(!history.length){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  history.forEach(entry=>{
+    const card = document.createElement('div');
+    card.className = 'hist-card';
+    const winnersHtml = entry.winners.map((w,i)=>`
+      <div class="hist-winner-row">
+        <div class="hist-num">${i+1}</div>
+        <div class="hist-winner-name">${w.name}</div>
+        <div class="hist-winner-ticket">${w.ticket}</div>
+      </div>`).join('');
+    card.innerHTML = `
+      <div class="hist-card-header">
+        <div>
+          <div class="hist-title">🏆 ${entry.name}</div>
+          <div class="hist-meta"><i class="ti ti-calendar" style="font-size:12px;vertical-align:-1px"></i> ${entry.date} &nbsp;·&nbsp; <i class="ti ti-users" style="font-size:12px;vertical-align:-1px"></i> ${entry.total} participantes</div>
+        </div>
+        <span class="hist-badge">${entry.winners.length} ganador${entry.winners.length>1?'es':''}</span>
+      </div>
+      <div class="hist-winners">${winnersHtml}</div>`;
+    list.appendChild(card);
+  });
+}
+
+function showSection(section){
+  document.getElementById('sectionDashboard').classList.toggle('hidden', section!=='dashboard');
+  document.getElementById('sectionHistorial').classList.toggle('hidden', section!=='historial');
+  document.getElementById('navDashboard').classList.toggle('active', section==='dashboard');
+  document.getElementById('navHistorial').classList.toggle('active', section==='historial');
+  if(section==='historial') renderHistorial();
 }
 
 function exportWinners(){
